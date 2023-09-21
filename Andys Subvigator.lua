@@ -19,16 +19,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.]]
-	
+    
 local ui = fu.UIManager
 local disp = bmd.UIDispatcher(ui)
 
 local lastTrack = 1
 local subTrack = 1
 local matchType = {MatchContains = true }
+local requiresReturn = true
 
 -- Setup 'Subvigator' window
-subvigator = disp:AddWindow({ID = 'MyWin', WindowTitle = "Andy's Subvigator", Geometry = {100, 100, 380, 700}, Spacing = 0, ui.VGroup{ui.VGap(2), ui.HGroup{Weight = 0, ui.HGap(10), ui.Label{ID = 'Label', Text = 'Filter', Weight = 0.05}, ui.LineEdit{ID = 'SearchText', PlaceholderText = 'Search Text Filter', Weight = 0.9}, ui:ComboBox{ID = 'SearchType', Weight = 0.05}, }, ui.VGap(2), ui.Tree{ID = 'Tree', SortingEnabled = true, Events = {ItemClicked = true, }, }, ui.VGap(2), ui.HGroup{Weight = 0, ui:ComboBox{ID = 'SearchTrack', Weight = 0.3, Events ={Activated = true,}}, ui.HGap(10), ui.Button{ID = 'refreshBtn', Text = 'Refresh'},ui.HGap(10)}, }, })
+subvigator = disp:AddWindow({ID = 'MyWin', WindowTitle = "Andy's Subvigator", Geometry = {100, 100, 380, 700 }, Spacing = 0, ui.VGroup{ui.VGap(2), ui.HGroup{Weight = 0, ui.HGap(10), ui.Label{ID = 'Label', Text = 'Filter', Weight = 0.05 }, ui.LineEdit{ID = 'SearchText', PlaceholderText = 'Search Text Filter', Weight = 0.9, Events = {TextChanged = true, ReturnPressed = true }, }, ui:ComboBox{ID = 'SearchType', Weight = 0.05 }, }, ui.HGroup{Weight = 0, ui.HGap(24), ui:CheckBox{ID = 'useDynamic', Text = 'Use dynamic filtering' }, }, ui.VGap(0), ui.Tree{ID = 'Tree', SortingEnabled = true, Events = {ItemClicked = true }, }, ui.VGap(2), ui.HGroup{Weight = 0, ui:ComboBox{ID = 'SearchTrack', Weight = 0.3, Events = {Activated = true }, }, ui.HGap(10), ui.Button{ID = 'refreshBtn', Text = 'Refresh' }, ui.HGap(10) }, }, })
 itm = subvigator:GetItems()
 
 projectManager = resolve:GetProjectManager()
@@ -58,10 +59,11 @@ itm.Tree:SetHeaderItem(hdr)
 -- Setup column widths
 itm.Tree.ColumnCount = 2
 itm.Tree.ColumnWidth[0] = 58
-itm.Tree.ColumnWidth[1] = 290
+itm.Tree.ColumnWidth[1] = 280
 
 -- Define function to add rows
 function populateTable(hide)
+    print('populate table')
     for row = 1, subsCount do
         itRow = itm.Tree:NewItem()
         itRow.Text[0] = string.format(zeroPad, row)
@@ -98,7 +100,8 @@ function subvigator.On.Tree.ItemClicked(ev)
 end
 
 -- Filter for search text
-function subvigator.On.SearchText.TextChanged(ev)
+function subvigator.On.SearchText.ReturnPressed(ev)-- TextChanged(ev)
+    print('perform text filter')
     mySearchText = itm.SearchText.Text
     hits = itm.Tree:FindItems(mySearchText, matchType, 1)
     if (mySearchText == '') then for row = 0, subsCount-1 do itm.Tree:TopLevelItem(row):SetHidden(false) end
@@ -108,19 +111,31 @@ function subvigator.On.SearchText.TextChanged(ev)
     end
 end
 
+-- Filter for search text
+function subvigator.On.SearchText.TextChanged(ev)-- TextChanged(ev)
+    print('text changed')
+    if (requiresReturn) then else subvigator.On.SearchText.ReturnPressed() end
+end
+
 -- Change search type
 function subvigator.On.SearchType.CurrentIndexChanged(ev)
     if itm.SearchType.CurrentIndex == 0 then matchType = {MatchContains = true }
     elseif itm.SearchType.CurrentIndex == 1 then matchType = {MatchExactly = true }
     elseif itm.SearchType.CurrentIndex == 2 then matchType = {MatchStartsWith = true }
     elseif itm.SearchType.CurrentIndex == 3 then matchType = {MatchEndsWith = true } end
-    subvigator.On.SearchText.TextChanged()
+    subvigator.On.SearchText.ReturnPressed()-- TextChanged()
 end
 
 -- Change search track
 function subvigator.On.SearchTrack.Activated(ev)
     subTrack = itm.SearchTrack.CurrentIndex +1
     if (not(subTrack == lastTrack)) then lastTrack = subTrack; subvigator.On.refreshBtn.Clicked() end
+end
+
+-- Change filtering method
+function subvigator.On.useDynamic.Clicked(ev)
+    requiresReturn = not(itm.useDynamic.Checked)
+    subvigator.On.SearchText.TextChanged()
 end
 
 -- Refresh table
